@@ -16,6 +16,28 @@ const app = express();
 
 app.use(express.json());
 
+
+// ============================================================
+// HTTP 请求日志
+// ============================================================
+//
+// 以后任何客户端访问这个服务，Render Logs 都会出现：
+//
+// [HTTP] GET /
+// [HTTP] POST /mcp
+//
+// 这样就能看出 ChatGPT 到底有没有真的连过来。
+//
+
+app.use((req, _res, next) => {
+  console.log(
+    `[HTTP] ${new Date().toISOString()} ${req.method} ${req.path}`
+  );
+
+  next();
+});
+
+
 const PORT = process.env.PORT || 3000;
 
 
@@ -35,7 +57,7 @@ const stickersPath = path.join(
 );
 
 
-// 你的实际目录现在是：
+// 你现在真实目录：
 // data/web/sticker-card.html
 const widgetPath = path.join(
   __dirname,
@@ -44,7 +66,7 @@ const widgetPath = path.join(
 
 
 // ============================================================
-// 读取资源
+// 读取数据
 // ============================================================
 
 const stickers = JSON.parse(
@@ -65,16 +87,14 @@ const widgetHtml = fs.readFileSync(
 // Widget 版本
 // ============================================================
 //
-// 以后只要修改：
+// 以后只要你改：
 //
 // sticker-card.html
 // CSP
 // widgetState
-// 恢复逻辑
+// UI 恢复逻辑
 //
-// 就把 v1 改为 v2 / v3 / v4。
-//
-// 这样可以降低客户端继续加载旧缓存的概率。
+// 就把 v1 改成 v2 / v3 / v4。
 //
 
 const STICKER_WIDGET_URI =
@@ -238,17 +258,13 @@ function createMcpServer() {
         "sticker-chatgpt-app",
 
       version:
-        "3.0.0"
+        "3.1.0"
     });
 
 
   // ==========================================================
   // MCP UI RESOURCE
   // ==========================================================
-  //
-  // sticker_pick 调用成功后，
-  // 客户端根据 outputTemplate 找到这个 UI。
-  //
 
   server.registerResource(
 
@@ -270,7 +286,6 @@ function createMcpServer() {
               STICKER_WIDGET_URI,
 
 
-            // ChatGPT MCP UI / Apps SDK HTML
             mimeType:
               "text/html+skybridge",
 
@@ -281,27 +296,13 @@ function createMcpServer() {
 
             _meta: {
 
-              // 给模型/客户端的 Widget 描述
               "openai/widgetDescription":
                 "Displays one selected sticker image from the user's personal sticker library.",
 
 
-              // 不需要额外边框
               "openai/widgetPrefersBorder":
                 false,
 
-
-              // ------------------------------------------------
-              // CSP
-              // ------------------------------------------------
-              //
-              // 图片全部来自：
-              //
-              // https://i.postimg.cc
-              //
-              // 以后新增其他图床，
-              // 必须把新域名加到 resource_domains。
-              //
 
               "openai/widgetCSP": {
 
@@ -374,6 +375,11 @@ function createMcpServer() {
 
     async ({ query }) => {
 
+      console.log(
+        `[TOOL] sticker_search query=${JSON.stringify(query)}`
+      );
+
+
       const ranked =
         stickers
           .map(
@@ -423,6 +429,11 @@ function createMcpServer() {
         );
 
 
+      console.log(
+        `[TOOL] sticker_search top=${candidates[0]?.id || "none"}`
+      );
+
+
       return {
 
         structuredContent: {
@@ -462,18 +473,6 @@ function createMcpServer() {
   // ==========================================================
   // TOOL 2：sticker_pick
   // ==========================================================
-  //
-  // 这个工具就是最终展示工具。
-  //
-  // 它一次性返回：
-  //
-  // id
-  // name
-  // labels
-  // imageUrl
-  //
-  // Widget 不再调第二个工具取图片。
-  //
 
   server.registerTool(
 
@@ -509,12 +508,6 @@ function createMcpServer() {
       },
 
 
-      // --------------------------------------------------------
-      // 最关键：
-      //
-      // 把 sticker_pick 与 UI resource 绑定。
-      // --------------------------------------------------------
-
       _meta: {
 
         "openai/outputTemplate":
@@ -533,6 +526,11 @@ function createMcpServer() {
 
     async ({ id }) => {
 
+      console.log(
+        `[TOOL] sticker_pick id=${id}`
+      );
+
+
       const sticker =
         stickers.find(
           (item) =>
@@ -541,6 +539,11 @@ function createMcpServer() {
 
 
       if (!sticker) {
+
+        console.log(
+          `[TOOL] sticker_pick not_found=${id}`
+        );
+
 
         return {
 
@@ -563,10 +566,6 @@ function createMcpServer() {
       }
 
 
-      // --------------------------------------------------------
-      // 最终结构化结果
-      // --------------------------------------------------------
-
       const result = {
 
         id:
@@ -583,14 +582,17 @@ function createMcpServer() {
       };
 
 
+      console.log(
+        `[TOOL] sticker_pick selected=${sticker.id} image=${sticker.imageUrl}`
+      );
+
+
       return {
 
-        // Widget 读取的主要数据
         structuredContent:
           result,
 
 
-        // 不支持 UI 的 MCP 客户端仍可读
         content: [
 
           {
@@ -604,7 +606,6 @@ function createMcpServer() {
         ],
 
 
-        // 额外 metadata
         _meta: {
 
           stickerId:
@@ -640,7 +641,7 @@ app.get(
         "sticker-chatgpt-app",
 
       version:
-        "3.0.0",
+        "3.1.0",
 
       stickerCount:
         stickers.length,
@@ -664,6 +665,15 @@ app.post(
 
   async (req, res) => {
 
+    const method =
+      req.body?.method || "unknown";
+
+
+    console.log(
+      `[MCP] method=${method}`
+    );
+
+
     const server =
       createMcpServer();
 
@@ -671,15 +681,10 @@ app.post(
     const transport =
       new StreamableHTTPServerTransport({
 
-        // Stateless 模式
         sessionIdGenerator:
           undefined
       });
 
-
-    // ----------------------------------------------------------
-    // 请求结束时清理资源
-    // ----------------------------------------------------------
 
     res.on(
       "close",
@@ -745,12 +750,8 @@ app.post(
 
 
 // ============================================================
-// 非 POST 的 /mcp
+// 浏览器直接访问 /mcp
 // ============================================================
-//
-// 浏览器直接打开 /mcp 时给一个明确提示，
-// 避免看到普通 404 以为服务坏了。
-//
 
 app.get(
   "/mcp",
@@ -772,7 +773,7 @@ app.get(
 
 
 // ============================================================
-// 启动服务器
+// 启动
 // ============================================================
 
 app.listen(
@@ -781,7 +782,7 @@ app.listen(
   () => {
 
     console.log(
-      `sticker-chatgpt-app v3 listening on port ${PORT}`
+      `sticker-chatgpt-app v3.1 listening on port ${PORT}`
     );
 
 
