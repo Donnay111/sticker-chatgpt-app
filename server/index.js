@@ -14,84 +14,95 @@ import { z } from "zod";
 
 const app = express();
 
-app.use(express.json());
+app.use(
+  express.json({
+    limit: "1mb"
+  })
+);
 
-const PORT = process.env.PORT || 10000;
+const PORT =
+  process.env.PORT || 10000;
+
+const OPENAI_API_KEY =
+  process.env.OPENAI_API_KEY;
 
 
 // ============================================================
-// 路径
+// 文件路径
 // ============================================================
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename =
+  fileURLToPath(import.meta.url);
 
-// 35 张贴纸
-const stickersPath = path.join(
-  __dirname,
-  "../data/stickers.json"
-);
+const __dirname =
+  path.dirname(__filename);
 
-// 普通网页目录
-const webDir = path.join(
-  __dirname,
-  "../data/web"
-);
+const stickersPath =
+  path.join(
+    __dirname,
+    "../data/stickers.json"
+  );
 
-// MCP UI 卡片
-const widgetPath = path.join(
-  webDir,
-  "sticker-card.html"
-);
+const webDir =
+  path.join(
+    __dirname,
+    "../data/web"
+  );
+
+const widgetPath =
+  path.join(
+    webDir,
+    "sticker-card.html"
+  );
 
 
 // ============================================================
-// 读取数据
+// 读取贴纸
 // ============================================================
 
-const stickers = JSON.parse(
-  fs.readFileSync(
-    stickersPath,
-    "utf-8"
-  )
-);
-
-const widgetHtml = fs.existsSync(widgetPath)
-  ? fs.readFileSync(
-      widgetPath,
+const stickers =
+  JSON.parse(
+    fs.readFileSync(
+      stickersPath,
       "utf-8"
     )
-  : `
-    <!doctype html>
-    <html>
-      <body>
-        <p>sticker-card.html not found</p>
-      </body>
-    </html>
-  `;
+  );
+
+const widgetHtml =
+  fs.existsSync(widgetPath)
+    ? fs.readFileSync(
+        widgetPath,
+        "utf-8"
+      )
+    : `
+      <!doctype html>
+      <html>
+        <body>
+          <p>Sticker widget unavailable.</p>
+        </body>
+      </html>
+    `;
 
 
 // ============================================================
 // 请求日志
 // ============================================================
 
-app.use((req, _res, next) => {
-  console.log(
-    `[HTTP] ${new Date().toISOString()} ${req.method} ${req.path}`
-  );
+app.use(
+  (req, _res, next) => {
 
-  next();
-});
+    console.log(
+      `[HTTP] ${new Date().toISOString()} ${req.method} ${req.path}`
+    );
+
+    next();
+  }
+);
 
 
 // ============================================================
-// 普通网页静态文件
+// 静态网页
 // ============================================================
-//
-// data/web/index.html
-// data/web/app.js
-// data/web/style.css
-//
 
 app.use(
   express.static(webDir)
@@ -99,10 +110,11 @@ app.use(
 
 
 // ============================================================
-// 工具函数
+// 贴纸工具
 // ============================================================
 
 function normalize(text = "") {
+
   return String(text)
     .toLowerCase()
     .replace(
@@ -119,19 +131,18 @@ function scoreSticker(
   query
 ) {
 
-  const q = normalize(query);
+  const q =
+    normalize(query);
 
   if (!q) {
     return 0;
   }
 
 
-  const words = q
-    .split(" ")
-    .map(
-      (word) => word.trim()
-    )
-    .filter(Boolean);
+  const words =
+    q
+      .split(" ")
+      .filter(Boolean);
 
 
   const name =
@@ -165,7 +176,6 @@ function scoreSticker(
   let score = 0;
 
 
-  // 整句命中
   if (
     haystack.includes(q)
   ) {
@@ -173,15 +183,11 @@ function scoreSticker(
   }
 
 
-  // 分词匹配
-  for (const word of words) {
+  for (
+    const word
+    of words
+  ) {
 
-    if (!word) {
-      continue;
-    }
-
-
-    // 名称包含
     if (
       name.includes(word)
     ) {
@@ -189,7 +195,6 @@ function scoreSticker(
     }
 
 
-    // 标签完全匹配
     if (
       normalizedLabels.some(
         (label) =>
@@ -199,7 +204,6 @@ function scoreSticker(
       score += 10;
     }
 
-    // 标签部分匹配
     else if (
       normalizedLabels.some(
         (label) =>
@@ -211,7 +215,6 @@ function scoreSticker(
     }
 
 
-    // 整体文本出现
     if (
       haystack.includes(word)
     ) {
@@ -226,79 +229,29 @@ function scoreSticker(
 
 function searchStickers(
   query,
-  limit = 8
+  limit = 6
 ) {
 
-  const ranked =
-    stickers
-      .map(
-        (sticker) => ({
-          id:
-            sticker.id,
+  return stickers
+    .map(
+      (sticker) => ({
+        ...sticker,
 
-          name:
-            sticker.name,
-
-          labels:
-            sticker.labels || [],
-
-          imageUrl:
-            sticker.imageUrl,
-
-          score:
-            scoreSticker(
-              sticker,
-              query
-            )
-        })
-      )
-      .filter(
-        (sticker) =>
-          sticker.score > 0
-      )
-      .sort(
-        (a, b) =>
-          b.score - a.score
-      )
-      .slice(
-        0,
-        limit
-      );
-
-
-  // 完全搜不到时给前几张兜底，
-  // 避免网页一片空白。
-  if (
-    ranked.length === 0
-  ) {
-
-    return stickers
-      .slice(
-        0,
-        limit
-      )
-      .map(
-        (sticker) => ({
-          id:
-            sticker.id,
-
-          name:
-            sticker.name,
-
-          labels:
-            sticker.labels || [],
-
-          imageUrl:
-            sticker.imageUrl,
-
-          score:
-            0
-        })
-      );
-  }
-
-
-  return ranked;
+        score:
+          scoreSticker(
+            sticker,
+            query
+          )
+      })
+    )
+    .sort(
+      (a, b) =>
+        b.score - a.score
+    )
+    .slice(
+      0,
+      limit
+    );
 }
 
 
@@ -314,7 +267,445 @@ function pickSticker(id) {
 
 
 // ============================================================
-// 普通网页 API：搜索
+// 给 AI 看的贴纸目录
+// ============================================================
+
+function getStickerCatalogForAI() {
+
+  return stickers
+    .map(
+      (sticker) => {
+
+        const labels =
+          Array.isArray(sticker.labels)
+            ? sticker.labels.join(" / ")
+            : "";
+
+        return (
+          `${sticker.id} | ` +
+          `${sticker.name} | ` +
+          `${labels}`
+        );
+      }
+    )
+    .join("\n");
+}
+
+
+// ============================================================
+// 从 Responses API 返回值提取文本
+// ============================================================
+
+function extractOutputText(data) {
+
+  if (
+    typeof data?.output_text === "string"
+  ) {
+
+    return data.output_text;
+  }
+
+
+  const output =
+    Array.isArray(data?.output)
+      ? data.output
+      : [];
+
+
+  for (
+    const item
+    of output
+  ) {
+
+    const content =
+      Array.isArray(item?.content)
+        ? item.content
+        : [];
+
+
+    for (
+      const part
+      of content
+    ) {
+
+      if (
+        typeof part?.text === "string"
+      ) {
+
+        return part.text;
+      }
+    }
+  }
+
+
+  return "";
+}
+
+
+// ============================================================
+// 清理模型 JSON
+// ============================================================
+
+function parseAIResult(text) {
+
+  const cleaned =
+    String(text || "")
+      .trim()
+      .replace(
+        /^```json\s*/i,
+        ""
+      )
+      .replace(
+        /^```\s*/i,
+        ""
+      )
+      .replace(
+        /\s*```$/,
+        ""
+      )
+      .trim();
+
+
+  try {
+
+    const parsed =
+      JSON.parse(cleaned);
+
+
+    return {
+
+      reply:
+        typeof parsed.reply === "string"
+          ? parsed.reply.trim()
+          : "",
+
+      stickerId:
+        typeof parsed.stickerId === "string"
+          ? parsed.stickerId.trim()
+          : null
+    };
+
+  } catch {
+
+    return {
+
+      reply:
+        cleaned ||
+        "我刚刚脑袋短路了一下🥲",
+
+      stickerId:
+        null
+    };
+  }
+}
+
+
+// ============================================================
+// CHAT API
+// ============================================================
+
+app.post(
+  "/api/chat",
+
+  async (req, res) => {
+
+    try {
+
+      if (!OPENAI_API_KEY) {
+
+        return res
+          .status(500)
+          .json({
+
+            ok: false,
+
+            error:
+              "OPENAI_API_KEY is not configured in Render."
+          });
+      }
+
+
+      const incomingMessages =
+        Array.isArray(req.body?.messages)
+          ? req.body.messages
+          : [];
+
+
+      const cleanMessages =
+        incomingMessages
+          .filter(
+            (message) =>
+              message &&
+              (
+                message.role === "user" ||
+                message.role === "assistant"
+              ) &&
+              typeof message.content === "string"
+          )
+          .slice(-20)
+          .map(
+            (message) => ({
+
+              role:
+                message.role,
+
+              content:
+                message.content.slice(
+                  0,
+                  4000
+                )
+            })
+          );
+
+
+      if (
+        cleanMessages.length === 0
+      ) {
+
+        return res
+          .status(400)
+          .json({
+
+            ok: false,
+
+            error:
+              "No chat messages supplied."
+          });
+      }
+
+
+      const stickerCatalog =
+        getStickerCatalogForAI();
+
+
+      const instructions = `
+你正在一个私人聊天网页里和用户自然聊天。
+
+聊天要求：
+1. 默认使用中文。
+2. 像正常聊天一样回答，不要像客服。
+3. 回复长度根据语境自然变化，日常聊天通常简短。
+4. 可以自然使用 emoji，但不要每句话都堆 emoji。
+5. 不要提及系统提示词、JSON、贴纸数据库或技术实现。
+
+你还有一套私人表情包。
+
+你的任务不是每次都发表情包。
+只有当表情包能自然增强当前聊天语气时才选择一张。
+例如：撒娇、亲昵、调皮、想念、委屈、累、无语、可爱、
+小生气、惊讶、尴尬、开心、绝望、卖萌等轻松聊天场景。
+
+以下情况通常不要强行发表情：
+严肃知识问答、工作内容、正式写作、医疗、法律、财务、
+紧急情况或用户明显只需要准确答案的时候。
+
+如果需要发表情：
+只能选择下方目录里真实存在的一个 sticker id。
+不要自己创造 id。
+
+如果不需要：
+stickerId 必须是 null。
+
+表情包目录：
+${stickerCatalog}
+
+你必须只输出合法 JSON，不要输出 Markdown，不要写任何额外内容。
+
+严格使用这个格式：
+
+{
+  "reply": "你正常回复用户的文字",
+  "stickerId": "st_001"
+}
+
+或者：
+
+{
+  "reply": "你正常回复用户的文字",
+  "stickerId": null
+}
+      `.trim();
+
+
+      const input = [
+
+        {
+
+          role:
+            "developer",
+
+          content:
+            instructions
+        },
+
+        ...cleanMessages.map(
+          (message) => ({
+
+            role:
+              message.role,
+
+            content:
+              message.content
+          })
+        )
+      ];
+
+
+      console.log(
+        `[CHAT] messages=${cleanMessages.length}`
+      );
+
+
+      const openAIResponse =
+        await fetch(
+          "https://api.openai.com/v1/responses",
+          {
+
+            method:
+              "POST",
+
+            headers: {
+
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${OPENAI_API_KEY}`
+            },
+
+            body:
+              JSON.stringify({
+
+                model:
+                  "gpt-5.6-luna",
+
+                input,
+
+                max_output_tokens:
+                  500
+              })
+          }
+        );
+
+
+      const data =
+        await openAIResponse.json();
+
+
+      if (
+        !openAIResponse.ok
+      ) {
+
+        console.error(
+          "[OPENAI ERROR]",
+          JSON.stringify(data)
+        );
+
+
+        return res
+          .status(
+            openAIResponse.status
+          )
+          .json({
+
+            ok: false,
+
+            error:
+              data?.error?.message ||
+              "OpenAI API request failed."
+          });
+      }
+
+
+      const rawText =
+        extractOutputText(data);
+
+
+      console.log(
+        `[CHAT RAW] ${rawText}`
+      );
+
+
+      const result =
+        parseAIResult(rawText);
+
+
+      let sticker = null;
+
+
+      if (
+        result.stickerId
+      ) {
+
+        const selected =
+          pickSticker(
+            result.stickerId
+          );
+
+
+        if (selected) {
+
+          sticker = {
+
+            id:
+              selected.id,
+
+            name:
+              selected.name,
+
+            labels:
+              selected.labels || [],
+
+            imageUrl:
+              selected.imageUrl
+          };
+
+
+          console.log(
+            `[CHAT STICKER] ${selected.id} ${selected.name}`
+          );
+        }
+      }
+
+
+      res.json({
+
+        ok:
+          true,
+
+        reply:
+          result.reply,
+
+        sticker
+      });
+
+    } catch (error) {
+
+      console.error(
+        "[CHAT ERROR]",
+        error
+      );
+
+
+      res
+        .status(500)
+        .json({
+
+          ok:
+            false,
+
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error)
+        });
+    }
+  }
+);
+
+
+// ============================================================
+// 可选普通搜索 API
 // ============================================================
 
 app.get(
@@ -328,78 +719,25 @@ app.get(
       ).trim();
 
 
-    const candidates =
-      searchStickers(
-        query,
-        8
-      );
-
-
     res.json({
-      ok: true,
+
+      ok:
+        true,
+
       query,
-      candidates
+
+      candidates:
+        searchStickers(
+          query,
+          8
+        )
     });
   }
 );
 
 
 // ============================================================
-// 普通网页 API：选择一张
-// ============================================================
-
-app.get(
-  "/api/pick",
-
-  (req, res) => {
-
-    const id =
-      String(
-        req.query.id || ""
-      ).trim();
-
-
-    const sticker =
-      pickSticker(id);
-
-
-    if (!sticker) {
-
-      return res
-        .status(404)
-        .json({
-          ok: false,
-          error:
-            "Sticker not found"
-        });
-    }
-
-
-    res.json({
-
-      ok: true,
-
-      sticker: {
-
-        id:
-          sticker.id,
-
-        name:
-          sticker.name,
-
-        labels:
-          sticker.labels || [],
-
-        imageUrl:
-          sticker.imageUrl
-      }
-    });
-  }
-);
-
-
-// ============================================================
-// 健康检查
+// HEALTH
 // ============================================================
 
 app.get(
@@ -409,16 +747,22 @@ app.get(
 
     res.json({
 
-      ok: true,
+      ok:
+        true,
 
       name:
         "sticker-chatgpt-app",
 
       version:
-        "web-mcp-1.0.0",
+        "chat-1.0.0",
 
       stickerCount:
         stickers.length,
+
+      openaiConfigured:
+        Boolean(
+          OPENAI_API_KEY
+        ),
 
       mcp:
         "/mcp"
@@ -428,16 +772,12 @@ app.get(
 
 
 // ============================================================
-// MCP UI 配置
+// MCP
 // ============================================================
 
 const STICKER_WIDGET_URI =
   "ui://sticker-card/v1.html";
 
-
-// ============================================================
-// 创建 MCP Server
-// ============================================================
 
 function createMcpServer() {
 
@@ -448,13 +788,9 @@ function createMcpServer() {
         "sticker-chatgpt-app",
 
       version:
-        "web-mcp-1.0.0"
+        "chat-1.0.0"
     });
 
-
-  // ==========================================================
-  // UI Resource
-  // ==========================================================
 
   server.registerResource(
 
@@ -502,10 +838,6 @@ function createMcpServer() {
   );
 
 
-  // ==========================================================
-  // MCP TOOL：sticker_search
-  // ==========================================================
-
   server.registerTool(
 
     "sticker_search",
@@ -516,17 +848,7 @@ function createMcpServer() {
         "Search stickers",
 
       description:
-        "Search the user's personal sticker library according to the current conversation. " +
-
-        "Use this proactively whenever a sticker would naturally fit casual emotional conversation. " +
-
-        "The user does not need to explicitly ask for a sticker. " +
-
-        "Suitable situations include affection, teasing, joking, cuteness, tiredness, helplessness, sadness, apology, embarrassment, excitement, surprise, playful reactions and light frustration. " +
-
-        "Do not force stickers into serious, formal, sensitive or inappropriate situations. " +
-
-        "After receiving candidates, choose the best match and call sticker_pick with the exact returned id.",
+        "Search the user's personal sticker library according to the current conversational context.",
 
       inputSchema: {
 
@@ -534,39 +856,17 @@ function createMcpServer() {
           z
             .string()
             .min(1)
-            .describe(
-              "Concise semantic meaning of the desired sticker, for example: 疲惫 无力 摆烂; 撒娇 委屈; 调皮 俏皮; 想你 撒娇"
-            )
-      },
-
-      _meta: {
-
-        "openai/toolInvocation/invoking":
-          "正在找合适的表情包…",
-
-        "openai/toolInvocation/invoked":
-          "找到合适的表情包啦"
       }
     },
 
 
     async ({ query }) => {
 
-      console.log(
-        `[TOOL] sticker_search query=${JSON.stringify(query)}`
-      );
-
-
       const candidates =
         searchStickers(
           query,
           6
         );
-
-
-      console.log(
-        `[TOOL] sticker_search top=${candidates[0]?.id || "none"}`
-      );
 
 
       return {
@@ -594,7 +894,6 @@ function createMcpServer() {
             )
         },
 
-
         content: [
 
           {
@@ -603,26 +902,18 @@ function createMcpServer() {
               "text",
 
             text:
-              [
-                "Sticker candidates:",
-                "",
-                ...candidates.map(
+              candidates
+                .map(
                   (item) =>
                     `${item.id} — ${item.name} — ${(item.labels || []).join(" / ")}`
-                ),
-                "",
-                "Choose the single best contextual match, then call sticker_pick using its exact id."
-              ].join("\n")
+                )
+                .join("\n")
           }
         ]
       };
     }
   );
 
-
-  // ==========================================================
-  // MCP TOOL：sticker_pick
-  // ==========================================================
 
   server.registerTool(
 
@@ -634,13 +925,7 @@ function createMcpServer() {
         "Show sticker",
 
       description:
-        "Pick exactly one sticker using a real id returned by sticker_search. " +
-
-        "This is the final display tool. " +
-
-        "It returns id, name, labels and imageUrl in structuredContent. " +
-
-        "Do not call another tool to retrieve the image after this.",
+        "Show one sticker using its exact sticker id.",
 
       inputSchema: {
 
@@ -648,31 +933,17 @@ function createMcpServer() {
           z
             .string()
             .min(1)
-            .describe(
-              "Exact sticker id returned by sticker_search"
-            )
       },
 
       _meta: {
 
         "openai/outputTemplate":
-          STICKER_WIDGET_URI,
-
-        "openai/toolInvocation/invoking":
-          "正在拿表情包…",
-
-        "openai/toolInvocation/invoked":
-          "表情包来啦"
+          STICKER_WIDGET_URI
       }
     },
 
 
     async ({ id }) => {
-
-      console.log(
-        `[TOOL] sticker_pick id=${id}`
-      );
-
 
       const sticker =
         pickSticker(id);
@@ -682,7 +953,8 @@ function createMcpServer() {
 
         return {
 
-          isError: true,
+          isError:
+            true,
 
           content: [
 
@@ -699,31 +971,22 @@ function createMcpServer() {
       }
 
 
-      const result = {
-
-        id:
-          sticker.id,
-
-        name:
-          sticker.name,
-
-        labels:
-          sticker.labels || [],
-
-        imageUrl:
-          sticker.imageUrl
-      };
-
-
-      console.log(
-        `[TOOL] sticker_pick selected=${sticker.id} image=${sticker.imageUrl}`
-      );
-
-
       return {
 
-        structuredContent:
-          result,
+        structuredContent: {
+
+          id:
+            sticker.id,
+
+          name:
+            sticker.name,
+
+          labels:
+            sticker.labels || [],
+
+          imageUrl:
+            sticker.imageUrl
+        },
 
         content: [
 
@@ -754,10 +1017,6 @@ function createMcpServer() {
 }
 
 
-// ============================================================
-// MCP 路由
-// ============================================================
-
 app.all(
   "/mcp",
 
@@ -786,16 +1045,12 @@ app.all(
       () => {
 
         try {
-
           transport.close();
-
         } catch {}
 
 
         try {
-
           server.close();
-
         } catch {}
       }
     );
@@ -817,7 +1072,7 @@ app.all(
     } catch (error) {
 
       console.error(
-        "MCP error:",
+        "[MCP ERROR]",
         error
       );
 
@@ -840,15 +1095,8 @@ app.all(
 
 
 // ============================================================
-// 首页
+// 首页兜底
 // ============================================================
-//
-// express.static(webDir) 会自动返回：
-//
-// data/web/index.html
-//
-// 所以这里仅作为兜底。
-//
 
 app.get(
   "/",
@@ -872,19 +1120,11 @@ app.get(
     }
 
 
-    res.json({
-
-      ok: true,
-
-      name:
-        "sticker-chatgpt-app",
-
-      message:
-        "index.html not found",
-
-      stickerCount:
-        stickers.length
-    });
+    res
+      .status(404)
+      .send(
+        "index.html not found"
+      );
   }
 );
 
@@ -899,22 +1139,19 @@ app.listen(
   () => {
 
     console.log(
-      `sticker-chatgpt-app web+mcp listening on port ${PORT}`
+      `Sticker Chat listening on port ${PORT}`
     );
-
 
     console.log(
       `Loaded ${stickers.length} stickers`
     );
 
+    console.log(
+      `OpenAI API configured: ${Boolean(OPENAI_API_KEY)}`
+    );
 
     console.log(
       `Web directory: ${webDir}`
-    );
-
-
-    console.log(
-      `Widget URI: ${STICKER_WIDGET_URI}`
     );
   }
 );
