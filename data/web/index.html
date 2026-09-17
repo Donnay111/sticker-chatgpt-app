@@ -1,42 +1,102 @@
 <!doctype html>
 <html lang="zh-CN">
+
 <head>
+
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>贴纸小站</title>
-  <link rel="stylesheet" href="./style.css" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Sticker Chat</title>
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  />
+
 </head>
+
+
 <body>
-  <div class="container">
-    <h1>贴纸小站 ✨</h1>
-    <p class="sub">输入情绪或语气，比如：委屈 / 想你 / 撒娇 / 绝望 / 可爱 / 生气</p>
 
-    <div class="search-bar">
-      <input id="queryInput" type="text" placeholder="比如：委屈撒娇 / 想你 / 宝宝 / 难过" />
-      <button id="searchBtn">搜索</button>
+  <main class="app">
+
+    <header class="topbar">
+
+      <div>
+
+        <h1>
+          Sticker Chat
+        </h1>
+
+        <div class="subtitle">
+          聊天的时候，它会自己决定要不要甩表情包 ✨
+        </div>
+
+      </div>
+
+
+      <button
+        id="clearButton"
+        class="clear-button"
+        type="button"
+      >
+        清空
+      </button>
+
+    </header>
+
+
+    <section
+      id="chat"
+      class="chat"
+    >
+
+      <div class="message assistant">
+
+        <div class="bubble">
+          宝宝我在 😼 现在这个才是聊天版。
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <div
+      id="typing"
+      class="typing hidden"
+    >
+      正在回复…
     </div>
 
-    <div class="quick-tags">
-      <button class="tag" data-q="撒娇">撒娇</button>
-      <button class="tag" data-q="想你">想你</button>
-      <button class="tag" data-q="委屈">委屈</button>
-      <button class="tag" data-q="绝望">绝望</button>
-      <button class="tag" data-q="开心">开心</button>
-      <button class="tag" data-q="可爱">可爱</button>
-    </div>
 
-    <div id="status" class="status"></div>
+    <footer class="composer">
 
-    <div id="results" class="results"></div>
+      <textarea
+        id="messageInput"
+        rows="1"
+        placeholder="发消息..."
+      ></textarea>
 
-    <div id="picked" class="picked hidden">
-      <h2>选中的贴纸</h2>
-      <img id="pickedImg" alt="selected sticker" />
-      <div id="pickedName" class="picked-name"></div>
-      <div id="pickedLabels" class="picked-labels"></div>
-    </div>
-  </div>
 
-  <script src="./app.js"></script>
+      <button
+        id="sendButton"
+        type="button"
+      >
+        发送
+      </button>
+
+    </footer>
+
+  </main>
+
+
+  <script src="/app.js"></script>
+
 </body>
+
 </html>
