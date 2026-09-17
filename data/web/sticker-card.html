@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Sticker</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      padding: 8px;
+    }
+
+    .card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      max-width: 320px;
+      padding: 8px;
+
+      border-radius: 16px;
+      background: transparent;
+    }
+
+    .sticker {
+      display: block;
+
+      width: auto;
+      height: auto;
+
+      max-width: 280px;
+      max-height: 280px;
+
+      object-fit: contain;
+      border-radius: 12px;
+    }
+
+    .name {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.3;
+      opacity: 0.7;
+      text-align: center;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="card" class="card hidden">
+    <img
+      id="sticker"
+      class="sticker"
+      alt="sticker"
+    />
+
+    <div
+      id="name"
+      class="name"
+    ></div>
+  </div>
+
+  <script>
+    const card = document.getElementById("card");
+    const image = document.getElementById("sticker");
+    const nameEl = document.getElementById("name");
+
+    function renderSticker(data) {
+      if (!data || !data.imageUrl) {
+        return;
+      }
+
+      image.src = data.imageUrl;
+      image.alt = data.name || "sticker";
+
+      nameEl.textContent = data.name || "";
+
+      card.classList.remove("hidden");
+
+      try {
+        window.openai?.setWidgetState?.({
+          id: data.id || "",
+          name: data.name || "",
+          labels: data.labels || [],
+          imageUrl: data.imageUrl
+        });
+      } catch (error) {
+        console.warn(
+          "Unable to save widget state:",
+          error
+        );
+      }
+    }
+
+    function restoreState() {
+      try {
+        const state =
+          window.openai?.widgetState;
+
+        if (state?.imageUrl) {
+          renderSticker(state);
+          return true;
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to restore widget state:",
+          error
+        );
+      }
+
+      return false;
+    }
+
+    function readToolOutput() {
+      try {
+        const output =
+          window.openai?.toolOutput;
+
+        if (!output) {
+          return false;
+        }
+
+        if (output.imageUrl) {
+          renderSticker(output);
+          return true;
+        }
+
+        if (
+          output.structuredContent &&
+          output.structuredContent.imageUrl
+        ) {
+          renderSticker(
+            output.structuredContent
+          );
+          return true;
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to read tool output:",
+          error
+        );
+      }
+
+      return false;
+    }
+
+    if (!restoreState()) {
+      readToolOutput();
+    }
+
+    window.addEventListener(
+      "openai:set_globals",
+      () => {
+        if (!restoreState()) {
+          readToolOutput();
+        }
+      }
+    );
+  </script>
+</body>
+</html>
