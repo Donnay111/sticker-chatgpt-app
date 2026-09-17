@@ -1,0 +1,212 @@
+[
+  {
+    "id": "st_001",
+    "name": "知道不",
+    "labels": ["卖萌", "提问", "撒娇", "求回应", "可爱", "你知道吗", "你明白了吗"],
+    "imageUrl": "https://i.postimg.cc/xJGx7cMF/1.jpg"
+  },
+  {
+    "id": "st_002",
+    "name": "日常可爱反应",
+    "labels": ["可爱", "日常", "轻松", "聊天互动"],
+    "imageUrl": "https://i.postimg.cc/5Qx7MbSg/2.jpg"
+  },
+  {
+    "id": "st_003",
+    "name": "万能反应",
+    "labels": ["万能", "日常", "可爱", "聊天互动", "轻松"],
+    "imageUrl": "https://i.postimg.cc/WFmWKhgQ/3.jpg"
+  },
+  {
+    "id": "st_004",
+    "name": "闹脾气式撒娇",
+    "labels": ["撒娇", "闹脾气", "小脾气", "可爱", "亲密互动"],
+    "imageUrl": "https://i.postimg.cc/62VjSynF/4.jpg"
+  },
+  {
+    "id": "st_005",
+    "name": "力竭",
+    "labels": ["疲惫", "无语", "力竭", "累", "撑不住", "搞笑"],
+    "imageUrl": "https://i.postimg.cc/XGKHhpdm/5.jpg"
+  },
+  {
+    "id": "st_006",
+    "name": "想你求关注",
+    "labels": ["想你", "求关注", "卖萌", "撒娇", "可爱", "亲密互动"],
+    "imageUrl": "https://i.postimg.cc/GTc71dxS/6.jpg"
+  },
+  {
+    "id": "st_007",
+    "name": "搞笑赔罪",
+    "labels": ["心虚", "犯错", "赔罪", "道歉", "搞笑", "求原谅"],
+    "imageUrl": "https://i.postimg.cc/LgHCM23C/7.jpg"
+  },
+  {
+    "id": "st_008",
+    "name": "日常反应",
+    "labels": ["日常", "轻松", "可爱", "聊天互动"],
+    "imageUrl": "https://i.postimg.cc/V0YGcmW7/8.jpg"
+  },
+  {
+    "id": "st_009",
+    "name": "日常反应",
+    "labels": ["日常", "轻松", "聊天互动", "可爱"],
+    "imageUrl": "https://i.postimg.cc/N2gJwBkV/9.jpg"
+  },
+  {
+    "id": "st_010",
+    "name": "日常反应",
+    "labels": ["日常", "可爱", "聊天互动"],
+    "imageUrl": "https://i.postimg.cc/N2gJwBxw/10.jpg"
+  },
+  {
+    "id": "st_011",
+    "name": "日常反应",
+    "labels": ["日常", "轻松", "可爱"],
+    "imageUrl": "https://i.postimg.cc/Fk9WQNVM/11.jpg"
+  },
+  {
+    "id": "st_012",
+    "name": "呆呆卖萌",
+    "labels": ["呆呆", "卖萌", "可爱", "发呆", "萌"],
+    "imageUrl": "https://i.postimg.cc/0K8WqPCg/12.jpg"
+  },
+  {
+    "id": "st_013",
+    "name": "卖萌期待",
+    "labels": ["卖萌", "期待", "可爱", "求回应", "聊天互动"],
+    "imageUrl": "https://i.postimg.cc/4HJLTs1X/13.jpg"
+  },
+  {
+    "id": "st_014",
+    "name": "委屈无力",
+    "labels": ["委屈", "无力", "难过", "可怜", "求安慰"],
+    "imageUrl": "https://i.postimg.cc/D42jKncv/14.jpg"
+  },
+  {
+    "id": "st_015",
+    "name": "害羞卖萌",
+    "labels": ["害羞", "被夸", "卖萌", "可爱", "不好意思"],
+    "imageUrl": "https://i.postimg.cc/GTc71djh/15.jpg"
+  },
+  {
+    "id": "st_016",
+    "name": "撒娇委屈哽咽",
+    "labels": ["撒娇", "委屈", "哽咽", "难过", "求安慰", "可怜"],
+    "imageUrl": "https://i.postimg.cc/Wq2WPT73/16.jpg"
+  },
+  {
+    "id": "st_017",
+    "name": "卖萌式委屈",
+    "labels": ["卖萌", "委屈", "被气到", "隐忍", "不爽", "可爱"],
+    "imageUrl": "https://i.postimg.cc/QVsn7JZ5/17.jpg"
+  },
+  {
+    "id": "st_018",
+    "name": "背书包期待",
+    "labels": ["期待", "开心", "兴奋", "出发", "可爱", "准备好了"],
+    "imageUrl": "https://i.postimg.cc/23mXW7Nh/18.jpg"
+  },
+  {
+    "id": "st_019",
+    "name": "日常互动",
+    "labels": ["日常", "轻松", "聊天互动", "可爱"],
+    "imageUrl": "https://i.postimg.cc/K4FsTDh7/19.jpg"
+  },
+  {
+    "id": "st_020",
+    "name": "无语不知道说啥",
+    "labels": ["无语", "不知道说啥", "没话说", "无奈", "聊天反应"],
+    "imageUrl": "https://i.postimg.cc/Z0ZDNxz8/20.jpg"
+  },
+  {
+    "id": "st_021",
+    "name": "凶萌不爽",
+    "labels": ["凶萌", "不爽", "生气", "可爱", "小脾气"],
+    "imageUrl": "https://i.postimg.cc/XX3D5k6c/21.jpg"
+  },
+  {
+    "id": "st_022",
+    "name": "无奈无话可说",
+    "labels": ["无奈", "无话可说", "没话说", "无语", "沉默"],
+    "imageUrl": "https://i.postimg.cc/LhR0P3FD/22.jpg"
+  },
+  {
+    "id": "st_023",
+    "name": "没心情玩梗",
+    "labels": ["无力", "无奈", "没招了", "累了", "摆烂", "不想挣扎", "疲惫"],
+    "imageUrl": "https://i.postimg.cc/V51HtWPF/23.jpg"
+  },
+  {
+    "id": "st_024",
+    "name": "委屈求安慰",
+    "labels": ["委屈", "求安慰", "撒娇", "哭", "难过", "可怜"],
+    "imageUrl": "https://i.postimg.cc/Sjqt9fbg/24.jpg"
+  },
+  {
+    "id": "st_025",
+    "name": "我的天哪",
+    "labels": ["惊讶", "我的天哪", "震惊", "吃惊", "不可思议"],
+    "imageUrl": "https://i.postimg.cc/4nZFcQRS/25.jpg"
+  },
+  {
+    "id": "st_026",
+    "name": "比耶",
+    "labels": ["开心", "得意", "比耶", "胜利", "可爱", "兴奋"],
+    "imageUrl": "https://i.postimg.cc/F1mnSVXC/26.jpg"
+  },
+  {
+    "id": "st_027",
+    "name": "日常互动",
+    "labels": ["日常", "轻松", "聊天互动", "可爱"],
+    "imageUrl": "https://i.postimg.cc/mhR69yWq/27.jpg"
+  },
+  {
+    "id": "st_028",
+    "name": "调皮搞怪",
+    "labels": ["调皮", "犯贱", "搞怪", "卖萌", "可爱", "欠欠的"],
+    "imageUrl": "https://i.postimg.cc/Z0ZDNxzQ/28.jpg"
+  },
+  {
+    "id": "st_029",
+    "name": "日常互动",
+    "labels": ["日常", "轻松", "聊天互动", "可爱"],
+    "imageUrl": "https://i.postimg.cc/nMZwmGfg/29.jpg"
+  },
+  {
+    "id": "st_030",
+    "name": "察言观色狗",
+    "labels": ["万能", "心虚", "不好意思", "察言观色", "试探", "尴尬", "可爱"],
+    "imageUrl": "https://i.postimg.cc/8sDnvmgq/30.jpg"
+  },
+  {
+    "id": "st_031",
+    "name": "犯贱",
+    "labels": ["犯贱", "欠欠的", "调皮", "搞怪", "逗人"],
+    "imageUrl": "https://i.postimg.cc/pyx1jJMw/31.jpg"
+  },
+  {
+    "id": "st_032",
+    "name": "万能无语",
+    "labels": ["无语", "没话说", "无奈", "万能", "沉默", "聊天反应"],
+    "imageUrl": "https://i.postimg.cc/rzcY4NL6/32.jpg"
+  },
+  {
+    "id": "st_033",
+    "name": "你就是我的婆娘",
+    "labels": ["亲密互动", "情侣", "占有欲", "宠溺", "你就是我的婆娘", "撒娇"],
+    "imageUrl": "https://i.postimg.cc/rzcY4NLL/33.jpg"
+  },
+  {
+    "id": "st_034",
+    "name": "亲亲",
+    "labels": ["亲亲", "喜欢", "撒娇", "亲密互动", "情侣", "可爱"],
+    "imageUrl": "https://i.postimg.cc/s1y0W4Rz/34.jpg"
+  },
+  {
+    "id": "st_035",
+    "name": "亲亲撒娇",
+    "labels": ["亲亲", "撒娇", "亲密互动", "喜欢", "可爱"],
+    "imageUrl": "https://i.postimg.cc/mhR69yGR/35.jpg"
+  }
+]
