@@ -16,52 +16,32 @@ const app = express();
 
 app.use(express.json());
 
-
-// ============================================================
-// HTTP 请求日志
-// ============================================================
-//
-// 以后任何客户端访问这个服务，Render Logs 都会出现：
-//
-// [HTTP] GET /
-// [HTTP] POST /mcp
-//
-// 这样就能看出 ChatGPT 到底有没有真的连过来。
-//
-
-app.use((req, _res, next) => {
-  console.log(
-    `[HTTP] ${new Date().toISOString()} ${req.method} ${req.path}`
-  );
-
-  next();
-});
-
-
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 
 // ============================================================
-// 文件路径
+// 路径
 // ============================================================
 
 const __filename = fileURLToPath(import.meta.url);
-
 const __dirname = path.dirname(__filename);
 
-
-// 35 张表情 JSON
+// 35 张贴纸
 const stickersPath = path.join(
   __dirname,
   "../data/stickers.json"
 );
 
-
-// 你现在真实目录：
-// data/web/sticker-card.html
-const widgetPath = path.join(
+// 普通网页目录
+const webDir = path.join(
   __dirname,
-  "../data/web/sticker-card.html"
+  "../data/web"
+);
+
+// MCP UI 卡片
+const widgetPath = path.join(
+  webDir,
+  "sticker-card.html"
 );
 
 
@@ -76,37 +56,53 @@ const stickers = JSON.parse(
   )
 );
 
+const widgetHtml = fs.existsSync(widgetPath)
+  ? fs.readFileSync(
+      widgetPath,
+      "utf-8"
+    )
+  : `
+    <!doctype html>
+    <html>
+      <body>
+        <p>sticker-card.html not found</p>
+      </body>
+    </html>
+  `;
 
-const widgetHtml = fs.readFileSync(
-  widgetPath,
-  "utf-8"
+
+// ============================================================
+// 请求日志
+// ============================================================
+
+app.use((req, _res, next) => {
+  console.log(
+    `[HTTP] ${new Date().toISOString()} ${req.method} ${req.path}`
+  );
+
+  next();
+});
+
+
+// ============================================================
+// 普通网页静态文件
+// ============================================================
+//
+// data/web/index.html
+// data/web/app.js
+// data/web/style.css
+//
+
+app.use(
+  express.static(webDir)
 );
 
 
 // ============================================================
-// Widget 版本
-// ============================================================
-//
-// 以后只要你改：
-//
-// sticker-card.html
-// CSP
-// widgetState
-// UI 恢复逻辑
-//
-// 就把 v1 改成 v2 / v3 / v4。
-//
-
-const STICKER_WIDGET_URI =
-  "ui://sticker-card/v1.html";
-
-
-// ============================================================
-// 文本标准化
+// 工具函数
 // ============================================================
 
 function normalize(text = "") {
-
   return String(text)
     .toLowerCase()
     .replace(
@@ -118,38 +114,36 @@ function normalize(text = "") {
 }
 
 
-// ============================================================
-// 表情匹配评分
-// ============================================================
-
 function scoreSticker(
   sticker,
   query
 ) {
 
-  const normalizedQuery =
-    normalize(query);
+  const q = normalize(query);
+
+  if (!q) {
+    return 0;
+  }
 
 
-  const words =
-    normalizedQuery
-      .split(" ")
-      .map(
-        (word) => word.trim()
-      )
-      .filter(Boolean);
+  const words = q
+    .split(" ")
+    .map(
+      (word) => word.trim()
+    )
+    .filter(Boolean);
+
+
+  const name =
+    normalize(
+      sticker.name || ""
+    );
 
 
   const labels =
     Array.isArray(sticker.labels)
       ? sticker.labels
       : [];
-
-
-  const normalizedName =
-    normalize(
-      sticker.name || ""
-    );
 
 
   const normalizedLabels =
@@ -171,25 +165,15 @@ function scoreSticker(
   let score = 0;
 
 
-  // ----------------------------------------------------------
-  // 整句直接命中
-  // ----------------------------------------------------------
-
+  // 整句命中
   if (
-    normalizedQuery &&
-    haystack.includes(
-      normalizedQuery
-    )
+    haystack.includes(q)
   ) {
-
     score += 20;
   }
 
 
-  // ----------------------------------------------------------
   // 分词匹配
-  // ----------------------------------------------------------
-
   for (const word of words) {
 
     if (!word) {
@@ -197,29 +181,25 @@ function scoreSticker(
     }
 
 
-    // 名称命中
+    // 名称包含
     if (
-      normalizedName.includes(
-        word
-      )
+      name.includes(word)
     ) {
-
       score += 8;
     }
 
 
-    // 标签完全命中
+    // 标签完全匹配
     if (
       normalizedLabels.some(
         (label) =>
           label === word
       )
     ) {
-
       score += 10;
     }
 
-    // 标签部分命中
+    // 标签部分匹配
     else if (
       normalizedLabels.some(
         (label) =>
@@ -227,7 +207,6 @@ function scoreSticker(
           word.includes(label)
       )
     ) {
-
       score += 6;
     }
 
@@ -236,7 +215,6 @@ function scoreSticker(
     if (
       haystack.includes(word)
     ) {
-
       score += 3;
     }
   }
@@ -244,6 +222,217 @@ function scoreSticker(
 
   return score;
 }
+
+
+function searchStickers(
+  query,
+  limit = 8
+) {
+
+  const ranked =
+    stickers
+      .map(
+        (sticker) => ({
+          id:
+            sticker.id,
+
+          name:
+            sticker.name,
+
+          labels:
+            sticker.labels || [],
+
+          imageUrl:
+            sticker.imageUrl,
+
+          score:
+            scoreSticker(
+              sticker,
+              query
+            )
+        })
+      )
+      .filter(
+        (sticker) =>
+          sticker.score > 0
+      )
+      .sort(
+        (a, b) =>
+          b.score - a.score
+      )
+      .slice(
+        0,
+        limit
+      );
+
+
+  // 完全搜不到时给前几张兜底，
+  // 避免网页一片空白。
+  if (
+    ranked.length === 0
+  ) {
+
+    return stickers
+      .slice(
+        0,
+        limit
+      )
+      .map(
+        (sticker) => ({
+          id:
+            sticker.id,
+
+          name:
+            sticker.name,
+
+          labels:
+            sticker.labels || [],
+
+          imageUrl:
+            sticker.imageUrl,
+
+          score:
+            0
+        })
+      );
+  }
+
+
+  return ranked;
+}
+
+
+function pickSticker(id) {
+
+  return (
+    stickers.find(
+      (sticker) =>
+        sticker.id === id
+    ) || null
+  );
+}
+
+
+// ============================================================
+// 普通网页 API：搜索
+// ============================================================
+
+app.get(
+  "/api/search",
+
+  (req, res) => {
+
+    const query =
+      String(
+        req.query.q || ""
+      ).trim();
+
+
+    const candidates =
+      searchStickers(
+        query,
+        8
+      );
+
+
+    res.json({
+      ok: true,
+      query,
+      candidates
+    });
+  }
+);
+
+
+// ============================================================
+// 普通网页 API：选择一张
+// ============================================================
+
+app.get(
+  "/api/pick",
+
+  (req, res) => {
+
+    const id =
+      String(
+        req.query.id || ""
+      ).trim();
+
+
+    const sticker =
+      pickSticker(id);
+
+
+    if (!sticker) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Sticker not found"
+        });
+    }
+
+
+    res.json({
+
+      ok: true,
+
+      sticker: {
+
+        id:
+          sticker.id,
+
+        name:
+          sticker.name,
+
+        labels:
+          sticker.labels || [],
+
+        imageUrl:
+          sticker.imageUrl
+      }
+    });
+  }
+);
+
+
+// ============================================================
+// 健康检查
+// ============================================================
+
+app.get(
+  "/health",
+
+  (_req, res) => {
+
+    res.json({
+
+      ok: true,
+
+      name:
+        "sticker-chatgpt-app",
+
+      version:
+        "web-mcp-1.0.0",
+
+      stickerCount:
+        stickers.length,
+
+      mcp:
+        "/mcp"
+    });
+  }
+);
+
+
+// ============================================================
+// MCP UI 配置
+// ============================================================
+
+const STICKER_WIDGET_URI =
+  "ui://sticker-card/v1.html";
 
 
 // ============================================================
@@ -254,16 +443,17 @@ function createMcpServer() {
 
   const server =
     new McpServer({
+
       name:
         "sticker-chatgpt-app",
 
       version:
-        "3.1.0"
+        "web-mcp-1.0.0"
     });
 
 
   // ==========================================================
-  // MCP UI RESOURCE
+  // UI Resource
   // ==========================================================
 
   server.registerResource(
@@ -274,54 +464,46 @@ function createMcpServer() {
 
     {},
 
-    async () => {
+    async () => ({
 
-      return {
+      contents: [
 
-        contents: [
+        {
 
-          {
+          uri:
+            STICKER_WIDGET_URI,
 
-            uri:
-              STICKER_WIDGET_URI,
+          mimeType:
+            "text/html+skybridge",
 
+          text:
+            widgetHtml,
 
-            mimeType:
-              "text/html+skybridge",
+          _meta: {
 
+            "openai/widgetDescription":
+              "Displays one selected sticker image from the user's personal sticker library.",
 
-            text:
-              widgetHtml,
+            "openai/widgetPrefersBorder":
+              false,
 
+            "openai/widgetCSP": {
 
-            _meta: {
+              connect_domains: [],
 
-              "openai/widgetDescription":
-                "Displays one selected sticker image from the user's personal sticker library.",
-
-
-              "openai/widgetPrefersBorder":
-                false,
-
-
-              "openai/widgetCSP": {
-
-                connect_domains: [],
-
-                resource_domains: [
-                  "https://i.postimg.cc"
-                ]
-              }
+              resource_domains: [
+                "https://i.postimg.cc"
+              ]
             }
           }
-        ]
-      };
-    }
+        }
+      ]
+    })
   );
 
 
   // ==========================================================
-  // TOOL 1：sticker_search
+  // MCP TOOL：sticker_search
   // ==========================================================
 
   server.registerTool(
@@ -333,22 +515,18 @@ function createMcpServer() {
       title:
         "Search stickers",
 
-
       description:
-        "Search the user's personal sticker library according to the current conversational context. " +
+        "Search the user's personal sticker library according to the current conversation. " +
 
-        "Use this tool proactively when a sticker would naturally improve a casual conversation. " +
+        "Use this proactively whenever a sticker would naturally fit casual emotional conversation. " +
 
         "The user does not need to explicitly ask for a sticker. " +
 
-        "Good situations include affection, teasing, joking, cuteness, tiredness, helplessness, sadness, apology, embarrassment, excitement, surprise, playful reactions, light frustration, or other casual emotional reactions. " +
+        "Suitable situations include affection, teasing, joking, cuteness, tiredness, helplessness, sadness, apology, embarrassment, excitement, surprise, playful reactions and light frustration. " +
 
-        "Do not force stickers into serious, formal, sensitive, medical, legal, financial, emergency, or otherwise inappropriate situations. " +
+        "Do not force stickers into serious, formal, sensitive or inappropriate situations. " +
 
-        "Search using a concise semantic description of the desired emotion or reaction. " +
-
-        "After receiving candidates, choose the best contextual match and call sticker_pick using the exact returned sticker id.",
-
+        "After receiving candidates, choose the best match and call sticker_pick with the exact returned id.",
 
       inputSchema: {
 
@@ -357,10 +535,9 @@ function createMcpServer() {
             .string()
             .min(1)
             .describe(
-              "Concise semantic meaning of the desired sticker. Examples: 疲惫 无力 摆烂; 撒娇 委屈 求安慰; 调皮 俏皮; 想你 撒娇; 无语 无奈"
+              "Concise semantic meaning of the desired sticker, for example: 疲惫 无力 摆烂; 撒娇 委屈; 调皮 俏皮; 想你 撒娇"
             )
       },
-
 
       _meta: {
 
@@ -380,52 +557,10 @@ function createMcpServer() {
       );
 
 
-      const ranked =
-        stickers
-          .map(
-            (sticker) => {
-
-              return {
-
-                ...sticker,
-
-                score:
-                  scoreSticker(
-                    sticker,
-                    query
-                  )
-              };
-            }
-          )
-          .sort(
-            (a, b) =>
-              b.score - a.score
-          )
-          .slice(
-            0,
-            6
-          );
-
-
       const candidates =
-        ranked.map(
-          (sticker) => {
-
-            return {
-
-              id:
-                sticker.id,
-
-              name:
-                sticker.name,
-
-              labels:
-                sticker.labels,
-
-              score:
-                sticker.score
-            };
-          }
+        searchStickers(
+          query,
+          6
         );
 
 
@@ -440,7 +575,23 @@ function createMcpServer() {
 
           query,
 
-          candidates
+          candidates:
+            candidates.map(
+              (item) => ({
+
+                id:
+                  item.id,
+
+                name:
+                  item.name,
+
+                labels:
+                  item.labels,
+
+                score:
+                  item.score
+              })
+            )
         },
 
 
@@ -451,7 +602,6 @@ function createMcpServer() {
             type:
               "text",
 
-
             text:
               [
                 "Sticker candidates:",
@@ -461,7 +611,7 @@ function createMcpServer() {
                     `${item.id} — ${item.name} — ${(item.labels || []).join(" / ")}`
                 ),
                 "",
-                "Choose the single best contextual match, then call sticker_pick with its exact id."
+                "Choose the single best contextual match, then call sticker_pick using its exact id."
               ].join("\n")
           }
         ]
@@ -471,7 +621,7 @@ function createMcpServer() {
 
 
   // ==========================================================
-  // TOOL 2：sticker_pick
+  // MCP TOOL：sticker_pick
   // ==========================================================
 
   server.registerTool(
@@ -483,18 +633,14 @@ function createMcpServer() {
       title:
         "Show sticker",
 
-
       description:
         "Pick exactly one sticker using a real id returned by sticker_search. " +
 
         "This is the final display tool. " +
 
-        "It returns id, name, labels, and imageUrl in structuredContent. " +
+        "It returns id, name, labels and imageUrl in structuredContent. " +
 
-        "The attached UI widget should display the image directly from imageUrl. " +
-
-        "Do not call another tool to retrieve the image after sticker_pick.",
-
+        "Do not call another tool to retrieve the image after this.",
 
       inputSchema: {
 
@@ -503,20 +649,17 @@ function createMcpServer() {
             .string()
             .min(1)
             .describe(
-              "Exact sticker id returned by sticker_search, for example st_023"
+              "Exact sticker id returned by sticker_search"
             )
       },
-
 
       _meta: {
 
         "openai/outputTemplate":
           STICKER_WIDGET_URI,
 
-
         "openai/toolInvocation/invoking":
           "正在拿表情包…",
-
 
         "openai/toolInvocation/invoked":
           "表情包来啦"
@@ -532,24 +675,14 @@ function createMcpServer() {
 
 
       const sticker =
-        stickers.find(
-          (item) =>
-            item.id === id
-        );
+        pickSticker(id);
 
 
       if (!sticker) {
 
-        console.log(
-          `[TOOL] sticker_pick not_found=${id}`
-        );
-
-
         return {
 
-          isError:
-            true,
-
+          isError: true,
 
           content: [
 
@@ -575,7 +708,7 @@ function createMcpServer() {
           sticker.name,
 
         labels:
-          sticker.labels,
+          sticker.labels || [],
 
         imageUrl:
           sticker.imageUrl
@@ -592,7 +725,6 @@ function createMcpServer() {
         structuredContent:
           result,
 
-
         content: [
 
           {
@@ -604,7 +736,6 @@ function createMcpServer() {
               `Selected sticker: ${sticker.name}`
           }
         ],
-
 
         _meta: {
 
@@ -624,53 +755,16 @@ function createMcpServer() {
 
 
 // ============================================================
-// 健康检查
+// MCP 路由
 // ============================================================
 
-app.get(
-  "/",
-
-  (_req, res) => {
-
-    res.json({
-
-      ok:
-        true,
-
-      name:
-        "sticker-chatgpt-app",
-
-      version:
-        "3.1.0",
-
-      stickerCount:
-        stickers.length,
-
-      widget:
-        STICKER_WIDGET_URI,
-
-      mcp:
-        "/mcp"
-    });
-  }
-);
-
-
-// ============================================================
-// MCP Streamable HTTP
-// ============================================================
-
-app.post(
+app.all(
   "/mcp",
 
   async (req, res) => {
 
-    const method =
-      req.body?.method || "unknown";
-
-
     console.log(
-      `[MCP] method=${method}`
+      `[MCP] method=${req.body?.method || req.method}`
     );
 
 
@@ -695,18 +789,14 @@ app.post(
 
           transport.close();
 
-        } catch {
-          // ignore
-        }
+        } catch {}
 
 
         try {
 
           server.close();
 
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
     );
 
@@ -750,24 +840,51 @@ app.post(
 
 
 // ============================================================
-// 浏览器直接访问 /mcp
+// 首页
 // ============================================================
+//
+// express.static(webDir) 会自动返回：
+//
+// data/web/index.html
+//
+// 所以这里仅作为兜底。
+//
 
 app.get(
-  "/mcp",
+  "/",
 
   (_req, res) => {
 
-    res
-      .status(405)
-      .json({
+    const indexPath =
+      path.join(
+        webDir,
+        "index.html"
+      );
 
-        ok:
-          false,
 
-        message:
-          "MCP endpoint is running. Use POST with an MCP client."
-      });
+    if (
+      fs.existsSync(indexPath)
+    ) {
+
+      return res.sendFile(
+        indexPath
+      );
+    }
+
+
+    res.json({
+
+      ok: true,
+
+      name:
+        "sticker-chatgpt-app",
+
+      message:
+        "index.html not found",
+
+      stickerCount:
+        stickers.length
+    });
   }
 );
 
@@ -782,7 +899,7 @@ app.listen(
   () => {
 
     console.log(
-      `sticker-chatgpt-app v3.1 listening on port ${PORT}`
+      `sticker-chatgpt-app web+mcp listening on port ${PORT}`
     );
 
 
@@ -792,12 +909,12 @@ app.listen(
 
 
     console.log(
-      `Widget URI: ${STICKER_WIDGET_URI}`
+      `Web directory: ${webDir}`
     );
 
 
     console.log(
-      `Widget file: ${widgetPath}`
+      `Widget URI: ${STICKER_WIDGET_URI}`
     );
   }
 );
