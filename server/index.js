@@ -1,5 +1,7 @@
 import express from "express";
-import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
@@ -9,89 +11,91 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  "https://svyuhtijqgzargzixhfs.supabase.co";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
+const stickersPath = path.join(__dirname, "../data/stickers.json");
 
-if (!SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn(
-    "SUPABASE_SERVICE_ROLE_KEY is missing. Add it in Render environment variables."
-  );
-}
-
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY || ""
+const stickers = JSON.parse(
+  fs.readFileSync(stickersPath, "utf-8")
 );
 
-function makeServer() {
+function normalize(text = "") {
+  return String(text)
+    .toLowerCase()
+    .replace(/[，。！？、,.!?;；:："'“”‘’（）()\[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scoreSticker(sticker, query) {
+  const q = normalize(query);
+
+  const words = q
+    .split(" ")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const haystack = normalize(
+    [
+      sticker.name,
+      ...(sticker.labels || []),
+    ].join(" ")
+  );
+
+  let score = 0;
+
+  for (const word of words) {
+    if (haystack.includes(word)) {
+      score += 5;
+    }
+
+    if (
+      sticker.labels?.some(
+        (label) => normalize(label) === word
+      )
+    ) {
+      score += 3;
+    }
+  }
+
+  if (haystack.includes(q)) {
+    score += 10;
+  }
+
+  return score;
+}
+
+function createMcpServer() {
   const server = new McpServer({
-    name: "sticker-mcp",
-    version: "1.0.0",
+    name: "sticker-chatgpt-app",
+    version: "2.0.0",
   });
 
   server.tool(
-    "search_stickers",
-    "When the current conversation naturally suits a sticker, proactively search for one even if the user did not explicitly ask. Use this for casual emotional conversation such as tiredness, affection, teasing, apology, excitement, embarrassment, helplessness, cuteness, joking, or similar situations. Do not force stickers into serious or inappropriate contexts.",
+    "sticker_search",
+    "Search the user's personal sticker library by conversational meaning. " +
+      "Use this proactively when a sticker would naturally fit the conversation, " +
+      "even if the user did not explicitly ask for one. " +
+      "Good situations include affection, teasing, apology, tiredness, helplessness, " +
+      "embarrassment, excitement, cuteness, surprise, joking, or casual emotional reactions. " +
+      "Do not force stickers into serious or inappropriate situations. " +
+      "After choosing the best candidate, call sticker_pick with the exact id.",
     {
       query: z
         .string()
+        .min(1)
         .describe(
-          "Concise semantic description of the sticker needed, e.g. 疲惫 无力 摆烂"
+          "Short semantic description of the desired sticker, such as 疲惫 无力 摆烂 or 撒娇 委屈 求安慰"
         ),
     },
     async ({ query }) => {
-      const { data, error } = await supabase
-        .from("sticker_catalog")
-        .select(
-          "id, public_url, ocr_text, visual_description, semantic_intent, tone_tags, use_intents, avoid_when, confidence"
-        )
-        .eq("assistant_enabled", true);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const words = query
-        .toLowerCase()
-        .split(/[\s，。！？、,.!?;；:：]+/)
-        .filter(Boolean);
-
-      const scored = (data || [])
-        .map((sticker) => {
-          const text = [
-            sticker.ocr_text || "",
-            sticker.visual_description || "",
-            sticker.semantic_intent || "",
-            ...(sticker.tone_tags || []),
-            ...(sticker.use_intents || []),
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          let score = 0;
-
-          for (const word of words) {
-            if (text.includes(word)) {
-              score += 1;
-            }
-          }
-
-          return {
-            ...sticker,
-            match_score: score,
-          };
-        })
-        .sort((a, b) => {
-          if (b.match_score !== a.match_score) {
-            return b.match_score - a.match_score;
-          }
-
-          return (b.confidence || 0) - (a.confidence || 0);
-        })
+      const ranked = stickers
+        .map((sticker) => ({
+          ...sticker,
+          score: scoreSticker(sticker, query),
+        }))
+        .sort((a, b) => b.score - a.score)
         .slice(0, 6);
 
       return {
@@ -100,9 +104,15 @@ function makeServer() {
             type: "text",
             text: JSON.stringify(
               {
-                candidates: scored,
+                query,
+                candidates: ranked.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  labels: item.labels,
+                  score: item.score,
+                })),
                 instruction:
-                  "Choose the most suitable real sticker_id, then call send_sticker.",
+                  "Choose the most suitable candidate and call sticker_pick using its exact id.",
               },
               null,
               2
@@ -114,28 +124,52 @@ function makeServer() {
   );
 
   server.tool(
-    "send_sticker",
-    "Send one sticker using a real sticker_id returned by search_stickers. Avoid repeating the same sticker unnecessarily.",
+    "sticker_pick",
+    "Pick and display exactly one sticker from sticker_search results. " +
+      "This tool returns the final sticker data including id, name, labels, and imageUrl. " +
+      "Do not call another tool to fetch the image after this.",
     {
-      sticker_id: z.string(),
+      id: z
+        .string()
+        .min(1)
+        .describe(
+          "Exact sticker id returned by sticker_search"
+        ),
     },
-    async ({ sticker_id }) => {
-      const { data, error } = await supabase
-        .from("sticker_catalog")
-        .select("id, public_url, semantic_intent, ocr_text")
-        .eq("id", sticker_id)
-        .eq("assistant_enabled", true)
-        .single();
+    async ({ id }) => {
+      const sticker = stickers.find(
+        (item) => item.id === id
+      );
 
-      if (error) {
-        throw new Error(error.message);
+      if (!sticker) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Sticker not found: ${id}`,
+            },
+          ],
+        };
       }
 
+      const structuredContent = {
+        id: sticker.id,
+        name: sticker.name,
+        labels: sticker.labels,
+        imageUrl: sticker.imageUrl,
+      };
+
       return {
+        structuredContent,
         content: [
           {
             type: "text",
-            text: JSON.stringify(data, null, 2),
+            text: JSON.stringify(
+              structuredContent,
+              null,
+              2
+            ),
           },
         ],
       };
@@ -149,12 +183,14 @@ app.get("/", (_req, res) => {
   res.json({
     ok: true,
     name: "sticker-chatgpt-app",
+    version: "2.0.0",
+    stickerCount: stickers.length,
     mcp: "/mcp",
   });
 });
 
 app.post("/mcp", async (req, res) => {
-  const server = makeServer();
+  const server = createMcpServer();
 
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -167,18 +203,30 @@ app.post("/mcp", async (req, res) => {
 
   try {
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await transport.handleRequest(
+      req,
+      res,
+      req.body
+    );
   } catch (error) {
     console.error("MCP error:", error);
 
     if (!res.headersSent) {
       res.status(500).json({
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
       });
     }
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`sticker-chatgpt-app listening on port ${PORT}`);
+  console.log(
+    `sticker-chatgpt-app v2 listening on port ${PORT}`
+  );
+  console.log(
+    `Loaded ${stickers.length} stickers`
+  );
 });
