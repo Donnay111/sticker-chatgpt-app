@@ -1,0 +1,14 @@
+{
+  "name": "sticker-chatgpt-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ChatGPT sticker app powered by Supabase and MCP",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^4.21.0"
+  }
+}
