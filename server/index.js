@@ -22,7 +22,8 @@ const stickersPath = path.join(
 
 const widgetPath = path.join(
   __dirname,
-  "../web/sticker-card.html"
+  "../data/web/sticker-card.html"
+);
 );
 
 const stickers = JSON.parse(
